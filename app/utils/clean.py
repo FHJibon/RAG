@@ -1,3 +1,16 @@
+def clean_pdf_text(text: str) -> str:
+    if not text:
+        return ""
+    lines = text.splitlines()
+    cleaned = []
+    for line in lines:
+        l = line.strip()
+        if re.fullmatch(r'\d{1,4}', l):
+            continue
+        if len(re.sub(r'[^a-zA-Z0-9]', '', l)) < 5:
+            continue
+        cleaned.append(l)
+    return '\n'.join(cleaned)
 import re
 from typing import List
 

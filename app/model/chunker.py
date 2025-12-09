@@ -1,9 +1,7 @@
 from pathlib import Path
 import uuid
-import time
 from typing import List, Dict, Any
 from pypdf import PdfReader
-from app.services.llm import agent_decide_chunk
 from app.utils.clean import split_paragraphs
 from app.config import CHUNK_MIN_LEN
 
@@ -28,23 +26,74 @@ def extract_paragraphs_from_pdf(pdf_path: str) -> List[Dict[str, Any]]:
     print(f"[Chunker] Total paragraphs to process: {len(out)}")
     return out
 
-def chunk_pdf_agentic(pdf_path: str, chat_model: str = None) -> List[Dict[str, Any]]:
+def _approx_token_len(text: str) -> int:
+    return max(1, len(text) // 4)
+
+
+def _merge_paragraphs_hierarchical(paras: List[Dict[str, Any]],
+                                   min_tokens: int = 200,
+                                   max_tokens: int = 1500,
+                                   overlap_ratio: float = 0.15) -> List[Dict[str, Any]]:
+    if not paras:
+        return []
+
+    chunks: List[Dict[str, Any]] = []
+    i = 0
+    n = len(paras)
+
+    target_tokens = (min_tokens + max_tokens) // 2
+    overlap_tokens = int(target_tokens * overlap_ratio)
+
+    while i < n:
+        current_texts = []
+        current_metas = []
+        current_tokens = 0
+        start_i = i
+
+        while i < n and current_tokens < max_tokens:
+            para = paras[i]
+            t = para["text"]
+            tokens = _approx_token_len(t)
+            if current_tokens >= min_tokens and current_tokens + tokens > max_tokens:
+                break
+            current_texts.append(t)
+            current_metas.append(para)
+            current_tokens += tokens
+            i += 1
+
+        if not current_texts:
+            para = paras[i]
+            current_texts.append(para["text"])
+            current_metas.append(para)
+            i += 1
+
+        merged_text = "\n\n".join(current_texts)
+        first = current_metas[0]
+        chunk = {
+            "id": str(uuid.uuid4()),
+            "text": merged_text,
+            "section_id": "auto", 
+            "page": first["page"],
+            "paragraph_index": first["paragraph_index"],
+            "confidence": 1.0,
+        }
+        chunks.append(chunk)
+
+        if i >= n:
+            break
+        back_tokens = 0
+        j = i - 1
+        while j > start_i and back_tokens < overlap_tokens:
+            back_tokens += _approx_token_len(paras[j]["text"])
+            j -= 1
+        i = max(j + 1, start_i + 1)
+
+    return chunks
+
+
+def build_pdf_chunks(pdf_path: str) -> List[Dict[str, Any]]:
     raw_paras = extract_paragraphs_from_pdf(pdf_path)
-    chunks = []
-    print(f"[Chunker] Starting LLM chunking for {len(raw_paras)} paragraphs...")
-    for i, item in enumerate(raw_paras):
-        print(f"[Chunker] LLM chunking paragraph {i+1}/{len(raw_paras)} (page {item['page']}, para {item['paragraph_index']})")
-        decision = agent_decide_chunk(item["text"], chat_model=chat_model)
-        time.sleep(0.05)
-        if decision.get("store"):
-            chunk = {
-                "id": str(uuid.uuid4()),
-                "text": item["text"],
-                "section_id": decision.get("section_id", "unknown"),
-                "page": item["page"],
-                "paragraph_index": item["paragraph_index"],
-                "confidence": float(decision.get("confidence", 0.0))
-            }
-            chunks.append(chunk)
+    print(f"[Chunker] Building chunks from {len(raw_paras)} paragraphs...")
+    chunks = _merge_paragraphs_hierarchical(raw_paras)
     print(f"[Chunker] Finished chunking. Chunks to store: {len(chunks)}")
     return chunks

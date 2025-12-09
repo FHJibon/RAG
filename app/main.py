@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from api.endpoints.chatbot import router as chatbot_router
+from app.api.endpoints.chatbot import router as chatbot_router
 
 app = FastAPI(title="AI Tax RAG Assistant - Backend")
 

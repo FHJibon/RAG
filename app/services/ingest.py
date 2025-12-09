@@ -1,21 +1,21 @@
-from app.model.chunker import chunk_pdf_agentic
+from app.model.chunker import build_pdf_chunks
 from app.model.pinecone_db import init_pinecone, upsert_batch
-from app.services.llm import embed_text
+from app.model.embeddings import embed_texts
 from app.config import DATA_PDF_PATH, PINECONE_INDEX
 import json
 import os
 
 def run_ingest(pdf_path: str = DATA_PDF_PATH, index_name: str = None):
-    print("Starting ingestion (agentic chunking)...")
-    chunks = chunk_pdf_agentic(pdf_path)
-    print(f"Agent selected {len(chunks)} chunks to store.")
+    print("Starting ingestion (hierarchical chunking)...")
+    chunks = build_pdf_chunks(pdf_path)
+    print(f"Chunks to store: {len(chunks)}")
     if not chunks:
         print("No chunks found. Exiting.")
         return
 
     index = init_pinecone(index_name)
     texts = [c["text"] for c in chunks]
-    embeddings = embed_text(texts)
+    embeddings = embed_texts(texts)
     vectors = []
     for c, emb in zip(chunks, embeddings):
         metadata = {
@@ -23,7 +23,8 @@ def run_ingest(pdf_path: str = DATA_PDF_PATH, index_name: str = None):
             "page": c["page"],
             "paragraph_index": c["paragraph_index"],
             "confidence": c["confidence"],
-            "source": "DATA.pdf"
+            "source": "DATA.pdf",
+            "text": c["text"]
         }
         vectors.append({"id": c["id"], "values": emb, "metadata": metadata})
 
