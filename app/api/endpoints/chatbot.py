@@ -17,7 +17,6 @@ def build_chunks_for_prompt(matches):
     return "\n".join(lines)
 
 def extract_json(text):
-    """Extract the first valid JSON object from a string."""
     import re
     import json
     match = re.search(r'{.*}', text, re.DOTALL)
@@ -56,7 +55,6 @@ def chat(req: ChatRequest):
 
     citations_out = []
     if not out or not isinstance(out, dict):
-        # Always return a valid response
         for m in matches:
             md = m.get("metadata", {}) or {}
             citations_out.append(Citation(

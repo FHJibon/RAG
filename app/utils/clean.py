@@ -1,33 +1,37 @@
-def clean_pdf_text(text: str) -> str:
-    if not text:
-        return ""
-    lines = text.splitlines()
-    cleaned = []
-    for line in lines:
-        l = line.strip()
-        if re.fullmatch(r'\d{1,4}', l):
-            continue
-        if len(re.sub(r'[^a-zA-Z0-9]', '', l)) < 5:
-            continue
-        cleaned.append(l)
-    return '\n'.join(cleaned)
 import re
 from typing import List
 
 def split_paragraphs(text: str) -> List[str]:
-    if not text:
-        return []
-    text = text.replace("\r\n", "\n").replace("\r", "\n")
-    paras = [p.strip() for p in re.split(r'\n{2,}', text) if p.strip()]
-    if not paras:
-        lines = [l.strip() for l in text.splitlines() if l.strip()]
-        paras = []
-        buffer = []
-        for line in lines:
-            buffer.append(line)
-            if len(" ".join(buffer)) > 200:
-                paras.append(" ".join(buffer))
-                buffer = []
-        if buffer:
-            paras.append(" ".join(buffer))
-    return paras
+    lines = text.splitlines()
+    cleaned_paragraphs = []
+    buffer = "" 
+    section_pattern = re.compile(r'^(\d+\.|[\(\[]\w+[\)\]]|\*+)')
+    garbage_pattern = re.compile(r'[†‡¶¨³µÅÖ]')
+    header_pattern = re.compile(
+        r'(Government of the People|National Board of Revenue|NOTIFICATION|S\.R\.O No|Dated:|Authentic English Text)',
+        re.IGNORECASE
+    )
+
+    for line in lines:
+        line = line.strip()
+        if not line: continue
+        if re.fullmatch(r'\d{1,6}', line): continue
+        if garbage_pattern.search(line): continue
+        if header_pattern.search(line): continue
+        if re.match(r'^\d+\s+The words.*substituted', line): continue
+        if section_pattern.match(line):
+            if buffer:
+                cleaned_paragraphs.append(buffer)
+            buffer = line
+        else:
+            if buffer:
+                if buffer.endswith('-'):
+                    buffer = buffer[:-1] + line 
+                else:
+                    buffer += " " + line
+            else:
+                buffer = line
+   
+    if buffer:
+        cleaned_paragraphs.append(buffer)
+    return cleaned_paragraphs
