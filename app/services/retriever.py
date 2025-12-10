@@ -3,7 +3,6 @@ from app.model.pinecone_db import init_pinecone, query
 from app.model.embeddings import embed_texts
 from app.config import TOP_K
 
-
 def _compute_lexical_score(query_text: str, doc_text: str) -> float:
     if not query_text or not doc_text:
         return 0.0
@@ -20,9 +19,9 @@ def _compute_lexical_score(query_text: str, doc_text: str) -> float:
     return overlap / max(1, len(q_tokens))
 
 
-def retrieve_top_chunks(query_text: str, k: int = None):
+def retrieve_top_chunks(query_text: str):
     idx = init_pinecone()
-    k = k or TOP_K
+    k = TOP_K
     emb = embed_texts([query_text])[0]
     matches = query(idx, emb, top_k=max(k * 2, k + 5), include_values=False)
 

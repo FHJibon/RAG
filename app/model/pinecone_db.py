@@ -19,13 +19,12 @@ def init_pinecone(index_name=None):
 
     pc = Pinecone(api_key=PINECONE_API_KEY)
 
-    existing_indexes = [i.name for i in pc.list_indexes()] 
-    
+    existing_indexes = [i.name for i in pc.list_indexes()]
+
     if target_index not in existing_indexes:
-        print(f"Creating index: {target_index}")
         pc.create_index(
             name=target_index,
-            dimension=1536,
+            dimension=3072,
             metric="cosine",
             spec=ServerlessSpec(
                 cloud="aws",

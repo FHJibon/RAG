@@ -1,9 +1,8 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing import Optional, List
 
 class Citation(BaseModel):
-    section_id: Optional[str] = None
-    page: Optional[int] = None
+    page: int
     score: Optional[float] = None
 
 class ChatRequest(BaseModel):

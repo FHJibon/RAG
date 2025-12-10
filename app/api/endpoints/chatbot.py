@@ -13,7 +13,7 @@ def build_chunks_for_prompt(matches):
     lines = []
     for i, m in enumerate(matches):
         md = m.get("metadata", {}) or {}
-        lines.append(f"{i+1}. id:{m.get('id')} sec:{md.get('section_id')} page:{md.get('page')} score:{m.get('score')}")
+        lines.append(f"{i+1}. id:{m.get('id')} page:{md.get('page')} score:{m.get('score')}")
     return "\n".join(lines)
 
 def extract_json(text):
@@ -43,51 +43,40 @@ def chat(req: ChatRequest):
             {"role": "user", "content": prompt}
         ],
         max_tokens=700,
-        temperature=0.0,
+        temperature=0.3,
     )
 
     raw = resp.choices[0].message.content.strip()
-    out = None
     try:
         out = json.loads(raw)
     except Exception:
         out = extract_json(raw)
 
+    answer = out.get("answer", "") if isinstance(out, dict) else "(assistant did not return valid JSON)"
     citations_out = []
     if not out or not isinstance(out, dict):
-        for m in matches:
-            md = m.get("metadata", {}) or {}
-            citations_out.append(Citation(
-                chunk_id=m.get("id"),
-                section_id=md.get("section_id"),
-                page=md.get("page"),
-                score=m.get("score")
-            ))
-        return ChatResponse(
-            answer="(assistant did not return valid JSON)",
-            citations=citations_out,
-        )
+        # fallback: return top-1 retrieved chunk as citation
+        m = matches[0] if matches else {}
+        md = m.get("metadata", {}) or {}
+        citations_out.append(Citation(
+            page=md.get("page"),
+            score=m.get("score")
+        ))
+        return ChatResponse(answer=answer, citations=citations_out)
 
     llm_cits = out.get("citations", [])
     if isinstance(llm_cits, list) and llm_cits:
-        for c in llm_cits:
-            citations_out.append(Citation(
-                chunk_id=c.get("chunk_id"),
-                section_id=c.get("section_id"),
-                page=c.get("page"),
-                score=c.get("score")
-            ))
+        c = llm_cits[0]
+        citations_out.append(Citation(
+            page=c.get("page"),
+            score=c.get("score")
+        ))
     else:
-        for m in matches:
-            md = m.get("metadata", {}) or {}
-            citations_out.append(Citation(
-                chunk_id=m.get("id"),
-                section_id=md.get("section_id"),
-                page=md.get("page"),
-                score=m.get("score")
-            ))
+        m = matches[0] if matches else {}
+        md = m.get("metadata", {}) or {}
+        citations_out.append(Citation(
+            page=md.get("page"),
+            score=m.get("score")
+        ))
 
-    return ChatResponse(
-        answer=out.get("answer", "") if isinstance(out, dict) else "(assistant did not return valid JSON)",
-        citations=citations_out,
-    )
+    return ChatResponse(answer=answer, citations=citations_out)
